@@ -1,0 +1,111 @@
+# coding:utf-8
+"""
+Time: 2021/3/6 19:32
+Author: eightyninth
+File: dataset_word.py
+"""
+import csv
+import os
+
+import torch
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+
+
+class hde_word_dataset(Dataset):
+    def __init__(self, data_path="./hde", is_train=True, transform=None):
+        super(hde_word_dataset, self).__init__()
+
+        self.is_train = is_train
+
+        # 数据增强
+        self.transform = transform
+
+        # 编码存储文件位置
+        word_path = os.path.join(data_path, "hde.csv")
+        # 读取对应字符与编码
+        with open(word_path, "r", encoding="gb18030") as wf:
+            reader = csv.reader(wf)
+            word_hde = [row for row in reader]
+
+        self.hde_dict = {}  # {字符: 编码}
+        self.imgs_train = []  # [编码, img_path]
+        self.imgs_val = []  # [编码, img_path]
+
+        for hde in word_hde:
+
+            img_label = hde[0]  # 文字
+            img_path = os.listdir(os.path.join(data_path, img_label.encode("utf-8")))  # 得到图像的存储位置
+
+            if len(img_path) == 0:
+                continue
+
+            # 记录编码
+            self.hde_dict.update({img_label: [h for h in hde[1:]]})
+
+            # 记录图像路径
+            for i in range(len(img_path)):
+
+                img_list = [[h for h in hde[1:]], img_path[i].encode("utf-8")]  # [字符, 编码, img_path]
+                # 训练集
+                if self.is_train & i < 15:
+                    self.imgs_train.append(img_list)
+                # 测试集
+                elif not self.is_train & 15 < i < 20:
+                    self.imgs_val.append(img_path[i].encode("utf-8"))
+                else:
+                    continue
+
+    def __len__(self):
+        if self.is_train:
+            img_num = len(self.imgs_train)
+        else:
+            img_num = len(self.imgs_val)
+        return img_num
+
+    def __getitem__(self, index):
+        if self.is_train:
+            img_path = self.imgs_train[index][-1]
+            hde = self.imgs_train[index][0]
+        else:
+            img_path = self.imgs_val[index][-1]
+            hde = self.imgs_val[index][0]
+
+        img = Image.open(img_path.decode("utf-8"))
+        if self.transform is not None:
+            img = self.transform(img)
+
+        return img, hde, self.hde_dict
+
+
+if __name__ == "__main__":
+    # pytorch 预定义均值与方差
+    mean = [0.5071, 0.4867, 0.4408]
+    stdv = [0.2675, 0.2565, 0.2761]
+
+    # 训练时数据增强
+    train_transforms = transforms.Compose([
+        transforms.ToPILImage(),  # 转变图像读取方式为PIL image
+        transforms.Resize(256),  # 把图像大小resize 到一个尺寸上
+        transforms.RandomHorizontalFlip(),  # 随机水平翻转图像
+        transforms.RandomVerticalFlip(),  # 随机垂直翻转图像
+        transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),  # 随机修改图像颜色空间
+        transforms.RandomPerspective(),  # 透视变换
+        transforms.ToTensor(),  # [0-255] -> [0,1]
+        transforms.Normalize(mean=mean, std=stdv)])  # 标准化 N ~ (0, 1)
+    # 验证时数据增强
+    val_transforms = transforms.Compose([
+        transforms.ToPILImage(),  # 转变图像读取方式为PIL image
+        transforms.Resize(256),  # 把图像大小resize 到一个尺寸上
+        transforms.ToTensor(),  # [0-255] -> [0,1]
+        transforms.Normalize(mean=mean, std=stdv)])  # 标准化 N ~ (0, 1)
+
+    dataset_train = hde_word_dataset("./picture", is_train=True, transform=train_transforms)
+    dataset_val = hde_word_dataset("./picture", is_train=False, transform=val_transforms)
+
+    dataloader_train = DataLoader(dataset=dataset_train, batch_size=3, shuffle=True, pin_memory=True)
+    dataloader_val = DataLoader(dataset=dataset_val, batch_size=3, shuffle=False, pin_memory=True)
+
+    for data, label in enumerate(dataloader_train):
+        pass
