@@ -103,7 +103,7 @@ if __name__ == "__main__":
         transforms.Resize(256),  # 把图像大小resize 到一个尺寸上
         transforms.RandomHorizontalFlip(),  # 随机水平翻转图像
         transforms.RandomVerticalFlip(),  # 随机垂直翻转图像
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.3),  # 随机修改图像颜色空间
+        transforms.ColorJitter(brightness=0.2, contrast=0.1, saturation=0.2, hue=0.3),  # 随机修改图像颜色空间
         transforms.RandomPerspective(),  # 透视变换
         transforms.ToTensor(),  # [0-255] -> [0,1]
         transforms.Normalize(mean=mean, std=stdv)])  # 标准化 N ~ (0, 1)
