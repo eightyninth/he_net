@@ -18,6 +18,7 @@ model_urls = {
     'wide_resnet101_2': 'https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth',
 }
 
+
 class ResNet(nn.Module, ABC):
     def __init__(self, name="resnet50", pretrain=True):
         super().__init__()
