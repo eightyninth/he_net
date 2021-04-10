@@ -62,15 +62,22 @@ class ResNet(nn.Module, ABC):
 
 
 class HDENet(nn.Module, ABC):
-    def __init__(self, out_dim, backbone="resnet50"):
+    def __init__(self, out_dim, input_size, backbone="resnet50"):
         super(HDENet, self).__init__()
+        self.input_size = input_size
+
         if backbone == "resnet34":
             self.backbone = ResNet("resnet34", True)
+            in_dim = 512 * (self.input_size / 32) ** 2
+
         if backbone == "resnet50":
             self.backbone = ResNet("resnet50", True)
+            in_dim = 2048 * (self.input_size / 32) ** 2
 
-        self.fc1 = nn.Linear(2048, 512, bias=False)
-        self.fc2 = nn.Linear(512, out_dim, bias=False)
+        self.fc1 = nn.Linear(in_features=int(in_dim), out_features=512, bias=False)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(in_features=512, out_features=out_dim, bias=False)
+        # self.softmax = nn.Softmax()
 
         self.d_p = nn.Parameter(torch.FloatTensor(1))
 
@@ -79,11 +86,20 @@ class HDENet(nn.Module, ABC):
         feat = self.backbone(img)
         feat = feat.view(img.size()[0], -1)
         # transfer
-        fc1 = self.fc1(feat)
-        fc2 = self.fc2(fc1)
+        fc1 = self.relu(self.fc1(feat))
+        fc2 = self.fc2(fc1)    #self.softmax(self.fc2(fc1))
+        # print(fc2.size())
+        # print(hde_arr.size())
         # compatibility
-        distance = util.cos_distance(fc2, hde_arr)
-        hde_distance = - self.d_p * distance
+        hde_distance = []
+        # the number of fc2 is batch size
+        for f in fc2:
+            h_d = []
+            f = f.repeat()
+            for hde in hde_arr:
+                d = util.cos_distance(f, hde)
+                h_d.append(- self.d_p * d)
+            hde_distance.append(h_d)
         return hde_distance
 
 
