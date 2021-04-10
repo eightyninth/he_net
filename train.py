@@ -6,6 +6,7 @@ File: train.py
 """
 import numpy as np
 import torch
+import re
 from torch.backends import cudnn
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
@@ -15,7 +16,15 @@ from dataset.dataset_word import hde_word_dataset
 from net.hde_net import HDENet
 from utils import util
 
-lr = 1e-4
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+
+is_resume = True
+lr = 1e-1
+resume_path = "./save_model/hde_net_19.pth"
+start_epoch = 0
+epochs = 20
 
 train_step = 0
 
@@ -32,13 +41,19 @@ train_transforms = transforms.Compose([
     transforms.ToTensor(),  # [0-255] -> [0,1]
     transforms.Normalize(mean=mean, std=stdv)])  # 标准化 N ~ (0, 1)
 
-train_data = hde_word_dataset("./picture", is_train=True, transform=train_transforms)
-val_data = hde_word_dataset("./picture", is_train=False, transform=train_transforms)
-train_dataloader= DataLoader(dataset=train_data, batch_size=6, num_workers=4, shuffle=True, pin_memory=True)
-val_dataloader = DataLoader(dataset=val_data, batch_size=3, num_workers=1, shuffle=True, pin_memory=True)
+train_data = hde_word_dataset("./dataset/picture", is_train=True, transform=train_transforms)
+val_data = hde_word_dataset("./dataset/picture", is_train=False, transform=train_transforms)
+
+hde_dict_train = train_data.get_dict()
+hde_dict_val = val_data.get_dict()
+
+train_dataloader = DataLoader(dataset=train_data, batch_size=15, num_workers=4, shuffle=True, pin_memory=True,
+                              drop_last=True)  # , collate_fn=util.collate_fn)
+val_dataloader = DataLoader(dataset=val_data, batch_size=15, num_workers=4, shuffle=False, pin_memory=True,
+                            drop_last=True)  # , collate_fn=util.collate_fn)
 
 # 部首有663个
-model = HDENet(663, "resnet50")
+model = HDENet(663, 256, "resnet34")
 
 device = None
 
@@ -50,57 +65,81 @@ else:
 
 model.to(device)
 
+# resume
+if is_resume:
+    util.load_model(model, resume_path)
+    start_epoch = int(re.sub("\D", "", resume_path)) + 1
+
 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
 
 scheduler = lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.9)
 
-train_loss = []
-test_loss = []
-test_acc = []
+for epoch in range(start_epoch, start_epoch + epochs):
+    train_loss = []
+    test_loss = []
+    train_acc = []
+    test_acc = []
 
-
-for epoch in range(100):
     scheduler.step()
 
     model.train()
 
     print('Epoch: {} : lr={}.'.format(epoch, scheduler.get_lr()))
 
-    for i, (img, img_char, hde_dict) in enumerate(train_dataloader):
+    for i, (img, img_char) in enumerate(iter(train_dataloader)):
 
         train_step += 1
 
-        hde_arr = torch.from_numpy(np.array([v for k, v in hde_dict.keys()]))
+        hde_arr = np.array([v for k, v in hde_dict_train.items()])
+        hde_arr = torch.from_numpy(hde_arr).type(torch.float32)
 
         img, hde_arr = img.to(device), hde_arr.to(device)
 
         hde_distance = model(img, hde_arr)
 
         # loss
-        loss = util.loss_MCPL(hde_distance, hde_distance[hde_distance == hde_arr[hde_dict[img_char]]])
+        hde_cur = []
+        for char in img_char:
+            for j, h_a in enumerate(hde_arr.cpu().numpy()):
+                if (h_a == hde_dict_train[char].astype(np.float32)).all():
+                    hde_cur.append(j)
+        # print(hde_cur)
+        loss = util.loss_MCPL(hde_distance, hde_cur)
 
+        acc = util.acc_cal(hde_distance, hde_cur)
         optimizer.zero_grad()
         loss.backward()
 
         optimizer.step()
 
-        train_loss.append(loss)
+        train_loss.append(loss.item())
+        train_acc.append(acc)
 
-    for i, (img, img_char, hde_dict) in enumerate(val_dataloader):
+        print('({:d} / {:d})  Train Loss: {} Train Accuracy {}'.format(i, len(train_dataloader), loss.item(), acc))
+
+    for i, (img, img_char) in enumerate(val_dataloader):
         train_step += 1
 
-        hde_arr = torch.from_numpy(np.array([v for k, v in hde_dict.keys()]))
+        hde_arr = np.array([v for k, v in hde_dict_train.items()])
+        hde_arr = torch.from_numpy(hde_arr).type(torch.float32)
 
         img, hde_arr = img.to(device), hde_arr.to(device)
 
         hde_distance = model(img, hde_arr)
 
         # loss
-        loss = util.loss_MCPL(hde_distance, hde_distance[hde_distance == hde_arr[hde_dict[img_char]]])
+        hde_cur = []
+        for char in img_char:
+            for j, h_a in enumerate(hde_arr.cpu().numpy()):
+                if (h_a == hde_dict_train[char].astype(np.float32)).all():
+                    hde_cur.append(j)
+        loss = util.loss_MCPL(hde_distance, hde_cur)
 
-        test_loss.append(loss)
+        acc = util.acc_cal(hde_distance, hde_cur)
 
-        print('({:d} / {:d})  Loss: {:.4f}'.format(i, len(train_dataloader), loss.item()))
+        test_loss.append(loss.item())
+        test_acc.append(acc)
 
-        if epoch % 10 == 0:
-            save_model(model, epoch, scheduler.get_lr(), optimizer)
+    print('({:d} / {:d})  val Loss: {:.4f} val Accuracy {}'.format(epoch, start_epoch + epochs, np.mean(test_loss), np.mean(test_acc)))
+
+    util.save_model(model, epoch, scheduler.get_lr(), optimizer)

@@ -46,7 +46,7 @@ class hde_word_dataset(Dataset):
                 continue
 
             # 记录编码
-            self.hde_dict.update({img_label: [h for h in hde[1:]]})
+            self.hde_dict.update({img_label: np.array([float(h) for h in hde[1:]])})
 
             # 记录图像路径
             for i in range(len(imgs_path)):
@@ -61,7 +61,10 @@ class hde_word_dataset(Dataset):
                 else:
                     continue
 
-        # pass    # test
+        pass    # test
+
+    def get_dict(self):
+        return self.hde_dict
 
     def __len__(self):
         if self.is_train:
@@ -79,17 +82,21 @@ class hde_word_dataset(Dataset):
             char = self.imgs_val[index][0]
 
         # jpg or png
-        img_type = imghdr.what(img_path)
-        if img_type == 'png':
-            img = Image.open(img_path).convert("RGB")
-        else:
-            img = Image.open(img_path)
+        img = Image.open(img_path)
+
+        if len(img.size) != 3:
+            img = img.convert("RGB")
 
         img = np.array(img)
-        if self.transform is not None:
-            img = self.transform(img)
 
-        return img, char, self.hde_dict
+        # padding to square
+        h, w, c = img.shape
+        img_pad = np.zeros((h, h, c), dtype=img.dtype) if h > w else np.zeros((w, w, c), dtype=img.dtype)
+        img_pad[:h, :w] = img
+        if self.transform is not None:
+            img_pad = self.transform(img_pad)
+
+        return img_pad, char
 
 
 if __name__ == "__main__":
@@ -120,7 +127,7 @@ if __name__ == "__main__":
     dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, shuffle=True)
     dataloader_val = DataLoader(dataset=dataset_val, batch_size=1, shuffle=False)
 
-    for i, (img, char, hde_dict) in enumerate(iter(dataloader_train)):
+    for i, (img, char) in enumerate(iter(dataloader_train)):
         # print(img)
         img = img[0].numpy()
         img = np.transpose(img, (1, 2, 0))
