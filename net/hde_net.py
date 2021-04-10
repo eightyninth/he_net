@@ -95,15 +95,14 @@ class HDENet(nn.Module, ABC):
         # the number of fc2 is batch size
         fc2_rp = fc2.reshape(fc2.shape[0], 1, fc2.shape[-1]).repeat(1, hde_arr.shape[0], 1)
         hde_arr_rp = hde_arr.repeat(fc2.shape[0], 1, 1)
-        hd = util.cos_distance(fc2_rp, hde_arr_rp)
-        hde_dis = - self.d_p * hd
-        for f in fc2:
-            h_d = []
-            f = f.repeat()
-            for hde in hde_arr:
-                d = util.cos_distance(f, hde)
-                h_d.append(- self.d_p * d)
-            hde_distance.append(h_d)
+        h_d = util.cos_distance(fc2_rp, hde_arr_rp)
+        hde_distance = - self.d_p * h_d
+        # for f in fc2:
+        #     h_d = []
+        #     for hde in hde_arr:
+        #         d = util.cos_distance(f, hde)
+        #         h_d.append(- self.d_p * d)
+        #     hde_distance.append(h_d)
         return hde_distance
 
 
