@@ -93,6 +93,10 @@ class HDENet(nn.Module, ABC):
         # compatibility
         hde_distance = []
         # the number of fc2 is batch size
+        fc2_rp = fc2.reshape(fc2.shape[0], 1, fc2.shape[-1]).repeat(1, hde_arr.shape[0], 1)
+        hde_arr_rp = hde_arr.repeat(fc2.shape[0], 1, 1)
+        hd = util.cos_distance(fc2_rp, hde_arr_rp)
+        hde_dis = - self.d_p * hd
         for f in fc2:
             h_d = []
             f = f.repeat()

@@ -11,7 +11,7 @@ import numpy as np
 
 
 def cos_distance(a, b):
-    return 1 - torch.nn.functional.cosine_similarity(a.view(1, -1), b.view(1, -1))
+    return 1 - torch.cosine_similarity(a, b, dim=-1)
 
 def loss_MCPL(total_a,b):
     total = []
