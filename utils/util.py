@@ -25,13 +25,15 @@ def loss_MCPL(total_a, b):
         #     t += torch.exp(a - t_a[t_b])
         # total.append(torch.log(t))
 
-    result = torch.mean(total)
+    # result = torch.mean(torch.Tensor(total)).requires_grad_(True)
+    # result2 = sum(total) / len(total)
     # result1 = torch.mean(total_1)
-    return result
+    # return torch.mean(torch.Tensor(total)).requires_grad_(True)
+    return sum(total) / len(total)
 
 
 def save_model(model, epoch, lr, optimzer):
-    save_dir = os.path.join("./save_model")
+    save_dir = os.path.join("./save_model_1")
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -55,11 +57,11 @@ def load_model(model, model_path):
 def acc_cal(hde_distance, hde_cur):
     acc = 0
     for (h_d, h_c) in zip(hde_distance, hde_cur):
-        hde_max_index = torch.argmax(torch.cat(h_d)).cpu().numpy()
+        hde_max_index = h_d.argmax().cpu().numpy()
         if hde_max_index == h_c:
             acc += 1
 
-    return acc / len(hde_distance)
+    return acc / hde_distance.shape[0]
 
 # def collate_fn(batch):
 #

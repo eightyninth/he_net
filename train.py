@@ -7,6 +7,7 @@ File: train.py
 import numpy as np
 import torch
 import re
+import time
 from torch.backends import cudnn
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
@@ -17,14 +18,16 @@ from net.hde_net import HDENet
 from utils import util
 
 import os
+import warnings
 
+warnings.filterwarnings("ignore")
 os.environ["CUDA_VISIBLE_DEVICES"] = '2'
 
-is_resume = True
-lr = 1e-1
-resume_path = "./save_model/hde_net_19.pth"
+is_resume = False
+lr = 1e-3
+resume_path = "./save_model_1/hde_net_491.pth"
 start_epoch = 0
-epochs = 20
+epochs = 50
 
 train_step = 0
 
@@ -36,13 +39,19 @@ train_transforms = transforms.Compose([
     transforms.Resize(256),  # 把图像大小resize 到一个尺寸上
     transforms.RandomHorizontalFlip(),  # 随机水平翻转图像
     transforms.RandomVerticalFlip(),  # 随机垂直翻转图像
-    transforms.ColorJitter(brightness=0.2, contrast=0.1, saturation=0.2, hue=0.3),  # 随机修改图像颜色空间
+    # transforms.ColorJitter(brightness=0.2, contrast=0.1, saturation=0.2, hue=0.3),  # 随机修改图像颜色空间
     transforms.RandomPerspective(),  # 透视变换
     transforms.ToTensor(),  # [0-255] -> [0,1]
     transforms.Normalize(mean=mean, std=stdv)])  # 标准化 N ~ (0, 1)
 
-train_data = hde_word_dataset("./dataset/picture", is_train=True, transform=train_transforms)
-val_data = hde_word_dataset("./dataset/picture", is_train=False, transform=train_transforms)
+val_transforms = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize(256),  # 把图像大小resize 到一个尺寸上
+        transforms.ToTensor(),  # [0-255] -> [0,1]
+        transforms.Normalize(mean=mean, std=stdv)])  # 标准化 N ~ (0, 1)
+
+train_data = hde_word_dataset("./dataset/picture_1", is_train=True, transform=train_transforms)
+val_data = hde_word_dataset("./dataset/picture_1", is_train=False, transform=val_transforms)
 
 hde_dict_train = train_data.get_dict()
 hde_dict_val = val_data.get_dict()
@@ -107,15 +116,21 @@ for epoch in range(start_epoch, start_epoch + epochs):
         loss = util.loss_MCPL(hde_distance, hde_cur)
 
         acc = util.acc_cal(hde_distance, hde_cur)
+
         optimizer.zero_grad()
         loss.backward()
-
         optimizer.step()
 
         train_loss.append(loss.item())
         train_acc.append(acc)
 
-        print('({:d} / {:d})  Train Loss: {} Train Accuracy {}'.format(i, len(train_dataloader), loss.item(), acc))
+        print('\r({:d} / {:d})  Train Loss: {} Train Accuracy {}'.format(i, len(train_dataloader), loss.item(), acc), end="", flush=True)
+        # time.sleep(0.001)
+    with open("result_1.txt", "a+") as f:
+        print('({:d} / {:d})  train Loss: {:.4f} train Accuracy {}'.format(epoch, start_epoch + epochs, np.mean(train_loss),
+                                                                       np.mean(train_acc)), file=f, flush=True)
+    print('\n({:d} / {:d})  Train Loss: {:.4f} Train Accuracy {}'.format(epoch, start_epoch + epochs, np.mean(train_loss), np.mean(train_acc)))
+
 
     for i, (img, img_char) in enumerate(val_dataloader):
         train_step += 1
@@ -140,6 +155,9 @@ for epoch in range(start_epoch, start_epoch + epochs):
         test_loss.append(loss.item())
         test_acc.append(acc)
 
+    with open("result_1.txt","a+") as f:
+        print('({:d} / {:d})  val Loss: {:.4f} val Accuracy {}'.format(epoch, start_epoch + epochs, np.mean(test_loss),
+                                                                       np.mean(test_acc)), file=f, flush=True)
     print('({:d} / {:d})  val Loss: {:.4f} val Accuracy {}'.format(epoch, start_epoch + epochs, np.mean(test_loss), np.mean(test_acc)))
 
     util.save_model(model, epoch, scheduler.get_lr(), optimizer)

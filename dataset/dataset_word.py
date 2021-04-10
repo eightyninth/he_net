@@ -42,7 +42,7 @@ class hde_word_dataset(Dataset):
             root_path = os.path.join(self.data_path, img_label.encode("utf-8").decode("utf-8"))
             imgs_path = os.listdir(root_path)  # 得到图像的存储位置
 
-            if len(imgs_path) < 20:
+            if len(imgs_path) < 2:
                 continue
 
             # 记录编码
@@ -53,10 +53,10 @@ class hde_word_dataset(Dataset):
                 img_path = os.path.join(root_path, imgs_path[i].encode("utf-8").decode("utf-8"))
                 img_list = [img_label, img_path]  # [字符, img_path]
                 # 训练集
-                if self.is_train and i < 15:
+                if self.is_train and i < len(imgs_path):
                     self.imgs_train.append(img_list)
                 # 测试集
-                elif not self.is_train and 15 < i < 20:
+                elif not self.is_train and len(imgs_path) - 1 <= i < len(imgs_path):
                     self.imgs_val.append(img_list)
                 else:
                     continue
