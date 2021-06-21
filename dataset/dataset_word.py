@@ -134,4 +134,3 @@ if __name__ == "__main__":
         plt.imshow(img)
         plt.show()
 
-        pass
