@@ -1,3 +1,4 @@
+LR = 0.001  // test ./dataset/picture_1/亿/毛泽东
 (0 / 50)  train Loss: 7.6136 train Accuracy 0.004933051444679351
 (0 / 50)  val Loss: 7.4005 val Accuracy 0.0026845637583892616
 (1 / 50)  train Loss: 6.6892 train Accuracy 0.04644115574348133
