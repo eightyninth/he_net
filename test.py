@@ -26,15 +26,14 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '2'
 # 加载 hde.csv
 def load_hde(path, device):
     hde_dict = {}
-    word_path = os.path.join(path, "hde.csv")
 
     # 读取对应字符与编码
-    with open(word_path, "r", encoding="gb18030") as wf:
+    with open(path, "r", encoding="gb18030") as wf:
         reader = csv.reader(wf)
         for row in reader:
             hde_dict.update({row[0]: np.array([float(r) for r in row[1:]])})
 
-    hde_arr = np.array([v for k, v in hde_dict.items()])
+    hde_arr = np.stack([v for k, v in hde_dict.items()])
     hde_arr = torch.from_numpy(hde_arr).type(torch.float32)
 
     return hde_dict, hde_arr.to(device)
@@ -56,7 +55,7 @@ def load_img(path, device, transforms=None):
     if transforms is not None:
         img_pad = transforms(img_pad)
 
-    return img_pad.to(device)
+    return img_pad.unsqueeze(0).to(device)
 
 # 网络使用
 def load_net(img, hde_arr, model, weight_path, device):
@@ -71,8 +70,8 @@ def load_net(img, hde_arr, model, weight_path, device):
 # 结果后处理
 def post_process(hde_dict, hde_arr, hde_dis):
     hde_max_index = hde_dis.argmax().cpu().numpy()
-    hde_pred = hde_arr[hde_max_index]
-    for k, v in hde_dict:
+    hde_pred = hde_arr[hde_max_index].cpu().numpy()
+    for k, v in hde_dict.items():
         if (hde_pred == v.astype(np.float32)).all():
             return k
 
@@ -98,7 +97,7 @@ if __name__ == "__main__":
     # 部首有663个
     model = HDENet(663, 256, "resnet34")
 
-    weight_path = ""
+    weight_path = "./save_model_1/hde_net_20.pth"
     hde_path = "./dataset/hde.csv"
     img_path = input("image_path: ")
 
